@@ -87,14 +87,7 @@ UserSettings::load(std::optional<QString> profile)
     openImageExternal_ = settings.value(QStringLiteral("user/open_image_external"), false).toBool();
     openVideoExternal_ = settings.value(QStringLiteral("user/open_video_external"), false).toBool();
     decryptSidebar_    = settings.value(QStringLiteral("user/decrypt_sidebar"), true).toBool();
-    auto tempSpaceNotifs = settings.value(QStringLiteral("user/space_notifications"), QString{})
-                             .toString()
-                             .toStdString();
-    auto spaceNotifsValue =
-      QMetaEnum::fromType<SpaceNotificationOptions>().keyToValue(tempSpaceNotifs.c_str());
-    if (spaceNotifsValue < 0)
-        spaceNotifsValue = 0;
-    spaceNotifications_ = static_cast<SpaceNotificationOptions>(spaceNotifsValue);
+    spaceNotifications_ = settings.value(QStringLiteral("user/space_notifications"), true).toBool();
     privacyScreen_      = settings.value(QStringLiteral("user/privacy_screen"), false).toBool();
     privacyScreenTimeout_ =
       settings.value(QStringLiteral("user/privacy_screen_timeout"), 0).toInt();
@@ -425,7 +418,7 @@ UserSettings::setDecryptSidebar(bool state)
 }
 
 void
-UserSettings::setSpaceNotifications(SpaceNotificationOptions state)
+UserSettings::setSpaceNotifications(bool state)
 {
     if (state == spaceNotifications_)
         return;
@@ -792,9 +785,7 @@ UserSettings::save()
 
     settings.setValue(QStringLiteral("avatar_circles"), avatarCircles_);
     settings.setValue(QStringLiteral("decrypt_sidebar"), decryptSidebar_);
-    settings.setValue(QStringLiteral("space_notifications"),
-                      QString::fromUtf8(QMetaEnum::fromType<SpaceNotificationOptions>().valueToKey(
-                        static_cast<int>(spaceNotifications_))));
+    settings.setValue(QStringLiteral("space_notifications"), spaceNotifications_);
     settings.setValue(QStringLiteral("privacy_screen"), privacyScreen_);
     settings.setValue(QStringLiteral("privacy_screen_timeout"), privacyScreenTimeout_);
     settings.setValue(QStringLiteral("mobile_mode"), mobileMode_);
@@ -1075,7 +1066,7 @@ UserSettingsModel::data(const QModelIndex &index, int role) const
         case DecryptSidebar:
             return i->decryptSidebar();
         case SpaceNotifications:
-            return static_cast<int>(i->spaceNotifications());
+            return i->spaceNotifications();
         case PrivacyScreen:
             return i->privacyScreen();
         case PrivacyScreenTimeout:
@@ -1307,7 +1298,6 @@ UserSettingsModel::data(const QModelIndex &index, int role) const
         case CameraResolution:
         case CameraFrameRate:
         case Ringtone:
-        case SpaceNotifications:
             return Options;
         case TimelineMaxWidth:
         case PrivacyScreenTimeout:
@@ -1342,6 +1332,7 @@ UserSettingsModel::data(const QModelIndex &index, int role) const
         case ShareKeysWithTrustedUsers:
         case UseOnlineKeyBackup:
         case ExposeDBusApi:
+        case SpaceNotifications:
             return Toggle;
         case Profile:
         case UserId:
@@ -1444,11 +1435,6 @@ UserSettingsModel::data(const QModelIndex &index, int role) const
                 l.push_back(i->ringtone());
             return l;
         }
-        case SpaceNotifications:
-            return QStringList{QStringLiteral("Sidebar and room list"),
-                               QStringLiteral("Sidebar"),
-                               QStringLiteral("Sidebar (hidden spaces and tags only)"),
-                               QStringLiteral("Off")};
         }
     } else if (role == Good) {
         switch (index.row()) {
@@ -1656,13 +1642,11 @@ UserSettingsModel::setData(const QModelIndex &index, const QVariant &value, int 
         }
             return i->decryptSidebar();
         case SpaceNotifications: {
-            if (value.toInt() >
-                  static_cast<int>(UserSettings::SpaceNotificationOptions::SpaceNotificationsOff) ||
-                value.toInt() < 0)
+            if (value.userType() == QMetaType::Bool) {
+                i->setSpaceNotifications(value.toBool());
+                return true;
+            } else
                 return false;
-
-            i->setSpaceNotifications(value.value<UserSettings::SpaceNotificationOptions>());
-            return true;
         }
         case PrivacyScreen: {
             if (value.userType() == QMetaType::Bool) {
